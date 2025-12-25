@@ -1,42 +1,52 @@
 const db = require('../config/db');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const logActivity = require('../utils/logActivity');
+const ldap = require('ldapjs');
 require('dotenv').config();
 
 // POST /login
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { username, password } = req.body; // use username instead of email
 
-  // DEBUG: log the incoming password for test
-  console.log('Request password:', password);
+  // LDAP client
+  
+  const client = ldap.createClient({
+    url: "ldap://localhost:389" // LOCAL TEST
+    // COMPANY AD: change to ldap://ad.company.local or ldaps://ad.company.local:636
+  });
 
-  try {
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-    const user = rows[0];
+  const dn = `uid=${username},dc=test,dc=local`; // LOCAL TEST
+  // COMPANY AD: DOMAIN\username or full CN from IT
 
-    if (!user) return res.status(400).json({ error: 'Invalid email or password' });
+  client.bind(dn, password, async (err) => {
+    if (err) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // DEBUG: log the hash from the database for test
-    console.log('DB hash:', user.password_hash);
+    try {
+      // Fetch role from app DB
+      const [rows] = await db.query(
+        'SELECT r.role_name FROM user_roles ur JOIN roles r ON ur.role_id = r.role_id WHERE ur.username = ?',
+        [username]
+      );
 
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(400).json({ error: 'Invalid email or password' });
+      let role = 'viewer'; // default role if not assigned
+      if (rows.length > 0) role = rows[0].role_name;
 
-    const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
+      // Create JWT
+      const token = jwt.sign(
+        { userId: username, role },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
 
-    // Log activity
-    await logActivity(user.id, 'User logged in');
+      // Log activity
+      await logActivity(username, 'User logged in');
 
-    res.json({ token });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: err.message });
-  }
+      res.json({ token });
+    } catch (dbErr) {
+      console.error('DB error:', dbErr);
+      res.status(500).json({ error: dbErr.message });
+    }
+  });
 };
 
 module.exports = { login };
