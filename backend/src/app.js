@@ -6,6 +6,7 @@ const pcAppRoutes = require('./routes/pcAppRoutes');
 const pcRoutes = require('./routes/pcRoutes');
 const appRoutes = require('./routes/appRoutes');     
 const authRoutes = require('./routes/authRoutes');   
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -17,7 +18,8 @@ app.use(express.json()); // parse JSON body
 app.use('/api/pcs', pcRoutes);
 app.use('/api/apps', appRoutes);
 app.use('/api/pc-app', pcAppRoutes);       
-app.use('/api/auth', authRoutes);     
+app.use('/api/auth', authRoutes);    
+app.use('/api/users', userRoutes); 
 
 // Default route
 app.get('/', (req, res) => {

@@ -2,17 +2,18 @@ const db = require('../config/db');
 
 /**
  * Logs a user action to the database
- * @param {number} userId - ID of the user performing the action
+ * @param {string} username - LDAP username of the user performing the action
  * @param {string} action - Description of the action (e.g., 'Created PC')
  * @param {string} details - Optional extra info (e.g., JSON string)
  */
-const logActivity = async (userId, action, details = null) => {
+const logActivity = async (username, action, details = null) => {
   try {
-    await db.query(
-      `INSERT INTO activity_log (user_id, action, details)
+    const [result] = await db.query(
+      `INSERT INTO activity_log (username, action, details)
        VALUES (?, ?, ?)`,
-      [userId, action, details]
+      [username, action, details]
     );
+    console.log(`Activity logged for ${username}: ${action}`);
   } catch (err) {
     console.error('Failed to log activity:', err.message);
   }
